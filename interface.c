@@ -70,7 +70,7 @@ static void display(struct Vector vector)
 
 void show_help(void)
 {
-    printf("Vector calculator: ./minimat [-h]\n");
+    printf("Super Cool Vector calculator: ./minimat [-h]\n");
     printf("Use spaces around =, +, -, and *.\n");
     printf("Names: 1-31 letters, digits, or underscores; start with a letter or _.\n");
     printf("Commands quit, clear, list, and help are reserved names.\n");

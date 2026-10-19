@@ -2,9 +2,8 @@
 * @file vector.c
 * @brief defines the structs
 * @author Mac Patterson
-* @date 9/30/2026
+* @date 10/13/2026
 * @version 5.3
-* just adding this line to "edit" code
 *********************************************************************/
 
 #include "vector.h"

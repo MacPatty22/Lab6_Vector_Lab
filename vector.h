@@ -2,14 +2,13 @@
 * @file vector.h
 * @brief header for the vector calculator
 * @author Mac Patterson
-* @date 9/30/2026
+* @date 10/13/2026
 * @version 5.3
 *********************************************************************/
 
 #ifndef VECTOR_H
 #define VECTOR_H
 
-#define MAX_VECTORS 10
 #define NAME_SIZE 32
 
 struct Vector

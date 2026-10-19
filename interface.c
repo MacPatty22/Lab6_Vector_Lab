@@ -2,7 +2,7 @@
 * @file inrterface.c
 * @brief entire interface code
 * @author Mac Patterson
-* @date 9/30/2026
+* @date 10/13/2026
 * @version 5.3
 *********************************************************************/
 
@@ -39,7 +39,8 @@ static int valid_name(const char *name)
         }
 
         if (strcmp(name, "quit") == 0 || strcmp(name, "clear") == 0 ||
-            strcmp(name, "list") == 0 || strcmp(name, "help") == 0)
+            strcmp(name, "list") == 0 || strcmp(name, "help") == 0 ||
+            strcmp(name, "load") == 0 || strcmp(name, "save") == 0)
         {
             valid = 0;
         }
@@ -70,11 +71,11 @@ static void display(struct Vector vector)
 
 void show_help(void)
 {
-    printf("Super Cool Vector calculator: ./minimat [-h]\n");
+    printf("Vector calculator: ./minimat [-h]\n");
     printf("Use spaces around =, +, -, and *.\n");
     printf("Names: 1-31 letters, digits, or underscores; start with a letter or _.\n");
-    printf("Commands quit, clear, list, and help are reserved names.\n");
-    printf("Store up to 10 vectors, each with three double components.\n");
+    printf("Commands quit, clear, list, help, load, and save are reserved names.\n");
+    printf("Store any number of vectors, each with three double components.\n");
     printf("  a = 1 2 3       Create or replace a vector\n");
     printf("  b = 4, 5, 6     Commas or spaces separate components\n");
     printf("  a               Display a vector\n");
@@ -84,9 +85,150 @@ void show_help(void)
     printf("  2.5 * a         Multiply in either order\n");
     printf("  c = a + b       Store an operation's result\n");
     printf("  list            Display stored vectors\n");
+    printf("  load file.csv   Load name,x,y,z lines; replaces same-named vectors\n");
+    printf("  save file.csv   Save all stored vectors to a CSV file\n");
     printf("  clear           Remove all stored vectors\n");
     printf("  help            Display this help\n");
     printf("  quit            Exit\n");
+}
+
+static void load_file(const char *filename)
+{
+    FILE *file;
+    char line[512];
+    char *fields[5];
+    char *start;
+    char *token;
+    struct Vector vector;
+    int count;
+    int line_number = 0;
+    int loaded = 0;
+    int skipped = 0;
+    int ch;
+
+    file = fopen(filename, "r");
+
+    if (file == NULL)
+    {
+        printf("Could not open '%s': %s\n", filename, strerror(errno));
+    }
+    else
+    {
+        while (fgets(line, sizeof(line), file) != NULL)
+        {
+            line_number++;
+
+            if (strchr(line, '\n') == NULL && !feof(file))
+            {
+                ch = fgetc(file);
+
+                while (ch != '\n' && ch != EOF)
+                {
+                    ch = fgetc(file);
+                }
+
+                printf("Line %d: too long, skipped.\n", line_number);
+                skipped++;
+            }
+            else
+            {
+                start = line;
+
+                /* skip the UTF-8 byte order mark Excel may add */
+                if (line_number == 1 && strncmp(line, "\xEF\xBB\xBF", 3) == 0)
+                {
+                    start = line + 3;
+                }
+
+                count = 0;
+                token = strtok(start, " ,\t\r\n");
+
+                while (token != NULL && count < 5)
+                {
+                    fields[count] = token;
+                    count++;
+                    token = strtok(NULL, " ,\t\r\n");
+                }
+
+                /* blank lines (count == 0) are ignored */
+                if (count > 0)
+                {
+                    if (count == 4 && valid_name(fields[0]) &&
+                        read_number(fields[1], &vector.values[0]) &&
+                        read_number(fields[2], &vector.values[1]) &&
+                        read_number(fields[3], &vector.values[2]))
+                    {
+                        strcpy(vector.name, fields[0]);
+
+                        if (addvect(vector))
+                        {
+                            loaded++;
+                        }
+                        else
+                        {
+                            printf("Line %d: memory full, not stored.\n",
+                                   line_number);
+                            skipped++;
+                        }
+                    }
+                    else
+                    {
+                        printf("Line %d: expected name,x,y,z - skipped.\n",
+                               line_number);
+                        skipped++;
+                    }
+                }
+            }
+        }
+
+        if (ferror(file))
+        {
+            printf("Error reading '%s'.\n", filename);
+        }
+
+        fclose(file);
+        printf("Loaded %d vector(s) from '%s'.\n", loaded, filename);
+
+        if (skipped > 0)
+        {
+            printf("%d line(s) skipped.\n", skipped);
+        }
+    }
+}
+
+static void save_file(const char *filename)
+{
+    FILE *file;
+    struct Vector vector;
+    int i = 0;
+    int write_error;
+
+    file = fopen(filename, "w");
+
+    if (file == NULL)
+    {
+        printf("Could not open '%s': %s\n", filename, strerror(errno));
+    }
+    else
+    {
+        while (getvect(i, &vector))
+        {
+            fprintf(file, "%s,%.15g,%.15g,%.15g\n", vector.name,
+                    vector.values[0], vector.values[1], vector.values[2]);
+            i++;
+        }
+
+        write_error = ferror(file);
+
+        if (fclose(file) != 0 || write_error)
+        {
+            printf("Error writing '%s'.\n", filename);
+        }
+        else
+        {
+            printf("Saved %d vector(s) to '%s'.\n", i, filename);
+        }
+    }
 }
 
 static int evaluate(char *parts[], int count, int assignment,
@@ -272,7 +414,6 @@ void run_interface(void)
     int running = 1;
     int count;
     int i;
-    int found;
     int ch;
 
     clear();
@@ -312,10 +453,10 @@ void run_interface(void)
 
             if (count > 0)
             {
-                switch (count == 1 ? parts[0][0] : '\0')
+                switch (count <= 2 ? parts[0][0] : '\0')
                 {
                     case 'q':
-                        if (strcmp(parts[0], "quit") == 0)
+                        if (count == 1 && strcmp(parts[0], "quit") == 0)
                         {
                             running = 0;
                         }
@@ -327,7 +468,7 @@ void run_interface(void)
                         break;
 
                     case 'h':
-                        if (strcmp(parts[0], "help") == 0)
+                        if (count == 1 && strcmp(parts[0], "help") == 0)
                         {
                             show_help();
                         }
@@ -339,7 +480,7 @@ void run_interface(void)
                         break;
 
                     case 'c':
-                        if (strcmp(parts[0], "clear") == 0)
+                        if (count == 1 && strcmp(parts[0], "clear") == 0)
                         {
                             clear();
                             printf("Vector memory cleared.\n");
@@ -352,22 +493,49 @@ void run_interface(void)
                         break;
 
                     case 'l':
-                        if (strcmp(parts[0], "list") == 0)
+                        if (count == 1 && strcmp(parts[0], "list") == 0)
                         {
-                            found = 0;
+                            i = 0;
 
-                            for (i = 0; i < MAX_VECTORS; i++)
+                            while (getvect(i, &vector))
                             {
-                                if (getvect(i, &vector))
-                                {
-                                    display(vector);
-                                    found = 1;
-                                }
+                                display(vector);
+                                i++;
                             }
 
-                            if (!found)
+                            if (i == 0)
                             {
                                 printf("No vectors stored.\n");
+                            }
+                        }
+                        else if (strcmp(parts[0], "load") == 0)
+                        {
+                            if (count == 2)
+                            {
+                                load_file(parts[1]);
+                            }
+                            else
+                            {
+                                printf("Usage: load <filename>\n");
+                            }
+                        }
+                        else
+                        {
+                            process_expression(parts, count);
+                        }
+
+                        break;
+
+                    case 's':
+                        if (strcmp(parts[0], "save") == 0)
+                        {
+                            if (count == 2)
+                            {
+                                save_file(parts[1]);
+                            }
+                            else
+                            {
+                                printf("Usage: save <filename>\n");
                             }
                         }
                         else

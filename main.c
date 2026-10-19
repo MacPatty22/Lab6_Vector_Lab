@@ -2,17 +2,21 @@
 * @file main.c
 * @brief the main for the program
 * @author Mac Patterson
-* @date 9/30/2026
+* @date 10/13/2026
 * @version 5.3
 *********************************************************************/
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "vector.h"
 
 int main(int argc, char *argv[])
 {
     int status = 0;
+
+    atexit(clear);
+
     if (argc == 1)
     {
         run_interface();
